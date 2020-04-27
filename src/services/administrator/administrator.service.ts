@@ -18,6 +18,15 @@ export class AdministratorService {
     getAll(): Promise<Administrator[]>{
         return this.administrator.find();
     }
+    async getByUsername(username: string): Promise<Administrator | null>{
+        const admin = await this.administrator.findOne({
+            username: username
+        });
+        if(admin){
+            return admin;
+        }
+        return null;
+    }
     getById(id: number): Promise<Administrator | ApiResponse>{
         return this.administrator.findOne(id);
     }
