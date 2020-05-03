@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseInterceptors, Param, UploadedFile } from "@nestjs/common";
+import { Controller, Post, Body, UseInterceptors, Param, UploadedFile, Req } from "@nestjs/common";
 import { Crud } from "@nestjsx/crud";
 import { ArticleService } from "src/services/article/article.service";
 import { Article } from "entities/article.entity";
@@ -10,6 +10,9 @@ import { ArticleFeature } from "entities/article-feature.entity";
 import { Photo } from "entities/photo.entity";
 import { ApiResponse } from "src/misc/api.response.class";
 import { StorageConfig } from "config/storage.config";
+import * as fileType from 'file-type';
+import * as fs from 'fs';
+import * as sharp from 'sharp';
 
 @Controller('api/article')
 @Crud({
@@ -67,7 +70,7 @@ export class ArticleController{
 
                     let original: string = file.originalname;
 
-                    let normalized = original.replace(/\S+/g, '-');
+                    let normalized = original.replace(/\s+/g, '-');
                     normalized = normalized.replace(/[^A-z0-9\.\-]/g, '');
 
                     let sada = new Date();
@@ -90,12 +93,14 @@ export class ArticleController{
             fileFilter: (req, file, callback) => {
                 //1. 
                 if (!file.originalname.match(/\.(jpg|png)$/)){
-                    callback(new Error('Bad file extensions!'), false);
+                    req.fileFilterError = 'Bad file extensions!';
+                    callback(null, false);
                     return;
                 }
                 //2.
                 if(!(file.mimetype.includes('jpeg') || file.mimetype.includes('png'))){
-                    callback(new Error('Bad file content!'), false);
+                    req.fileFilterError = 'Bad file content!';
+                    callback(null, false);
                     return;
                 }
                 callback(null, true);
@@ -107,7 +112,38 @@ export class ArticleController{
 
         })
     )
-   async uploadPhoto(@Param('id') articleId: number, @UploadedFile() photo): Promise<ApiResponse | Photo>{
+   async uploadPhoto(
+       @Param('id') articleId: number,
+        @UploadedFile() photo,
+        @Req() req
+        ): Promise<ApiResponse | Photo>{
+            
+            if(req.fileFilterError){
+                return new ApiResponse('error', -4002, req.fileFilterError);
+            }
+
+            if(!photo){
+                return new ApiResponse('error', -4002, 'File not uploaded!');
+            }
+            //Real mime type check 
+            const fileTypeResult = await fileType.fromFile(photo.path);
+            if(!fileTypeResult){
+                //obrisati taj fajl
+                fs.unlinkSync(photo.path);
+                return new ApiResponse('error', -4002, 'Cannot detect file type!');
+            }
+
+        const realMimeType = fileTypeResult.mime;
+        if(!(realMimeType.includes('jpeg') || realMimeType.includes('png'))){
+             //obrisati taj fajl
+             fs.unlinkSync(photo.path);
+             return new ApiResponse('error', -4002, 'Bad file content type!');
+        }
+
+        //Save a resized file
+        await this.createThumb(photo);
+        await this.createSmallImage(photo);
+
         const newPhoto: Photo = new Photo();
         newPhoto.articleId = articleId;
         newPhoto.imagePath = photo.filename;
@@ -116,5 +152,40 @@ export class ArticleController{
             return new ApiResponse('error', -4001);
         }
         return savedPhoto;
+    }
+
+    async createThumb(photo){
+        const orginalFilePath = photo.path;
+        const fileName = photo.fileName;
+
+        const destinationFilePath = StorageConfig.photosDestination + "thumb/" + fileName;
+       
+        await sharp(orginalFilePath)
+                .resize({
+                    fit: 'cover',
+                    width: StorageConfig.photoThumbSize.width,
+                    height: StorageConfig.photoThumbSize.height,
+                    background: {
+                        r: 255, g: 255, b: 255, alpha: 0.0
+                    }
+                })
+                .toFile(destinationFilePath);
+    }
+    async createSmallImage(photo){
+        const orginalFilePath = photo.path;
+        const fileName = photo.fileName;
+
+        const destinationFilePath = StorageConfig.photosDestination + "small/" + fileName;
+
+        await sharp(orginalFilePath)
+                .resize({
+                    fit: 'cover',
+                    width: StorageConfig.photoSmallSize.width,
+                    height: StorageConfig.photoSmallSize.height,
+                    background: {
+                        r: 255, g: 255, b: 255, alpha: 0.0
+                    }
+                })
+                .toFile(destinationFilePath);
     }
 }
