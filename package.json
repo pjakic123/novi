@@ -28,7 +28,7 @@
     "@nestjsx/crud": "^4.4.5",
     "@nestjsx/crud-request": "^4.4.5",
     "@nestjsx/crud-typeorm": "^4.4.4",
-    "class-transformer": "^0.2.3",
+    "class-transformer": "^0.3.1",
     "file-type": "^14.2.0",
     "jsonwebtoken": "^8.5.1",
     "mysql": "^2.18.1",
