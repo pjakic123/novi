@@ -30,7 +30,7 @@
     "@nestjsx/crud-typeorm": "^4.4.4",
     "class-transformer": "^0.2.3",
     "file-type": "^14.2.0",
-    "jsonwebtoken": "^8.5.1",
+    "jsonwebtoken": "^9.0.0",
     "mysql": "^2.18.1",
     "reflect-metadata": "^0.1.13",
     "rimraf": "^3.0.2",
